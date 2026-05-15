@@ -1,0 +1,26 @@
+[0m[[0m[31merror[0m] [0m[0m[31m[31m-- Error: D:\audio-viz\src\main\scala\app\Main.scala:50:11 ---------------------[0m[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m50 |[0m           [33melse[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m   |[0m           ^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0mThe start of this line does not match any of the previous indentation widths.[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0mIndentation width of current line : 11 spaces[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0mThis falls between previous widths: 6 spaces and 14 spaces[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m-- [E008] Not Found Error: D:\audio-viz\src\main\scala\app\Main.scala:32:46 ----[0m[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m32 |[0m      frames       = framesReader.run(config).run(wav)[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m   |[0m                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0mvalue run is not a member of domain.WavData => Vector[domain.SpectrumFrame][0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m-- [E008] Not Found Error: D:\audio-viz\src\main\scala\app\Main.scala:34:47 ----[0m[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m34 |[0m      _ <- IO.println([31ms"FFT: получено [0m${frames.length}[31m кадров"[0m)[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m   |[0m                                        ^^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m                                     value length is not a member of Any[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m-- [E007] Type Mismatch Error: D:\audio-viz\src\main\scala\app\Main.scala:37:42 [0m[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m37 |[0m      beatResult = BeatDetector.detectAll(frames, config.beatThreshold, config.beatWindow)[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m   |[0m                                          ^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m                                  Found:    (frames : Any)[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m                                  Required: Vector[domain.SpectrumFrame][0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m longer explanation available when compiling with `-explain`[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m-- [E008] Not Found Error: D:\audio-viz\src\main\scala\app\Main.scala:38:39 ----[0m[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m38 |[0m      _         <- printLog(beatResult.log)[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m   |[0m                            ^^^^^^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m                            value log is not a member of Any[0m
+[0m[[0m[31merror[0m] [0m[0m5 errors found[0m
