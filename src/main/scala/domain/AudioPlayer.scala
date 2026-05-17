@@ -7,20 +7,23 @@ import java.io.File
 
 /** Воспроизведение WAV-файла через javax.sound.sampled.
   *
-  * Используется Clip — он загружает весь файл в память и проигрывает.
-  * Подходит для файлов до ~1 минуты, для длинных лучше SourceDataLine,
-  * но для курсача Clip вполне достаточно.
+  * Clip позволяет узнать текущую позицию воспроизведения в микросекундах,
+  * что мы используем для точной синхронизации визуализации со звуком.
   */
 object AudioPlayer:
 
-  /** Состояние плеера: запущенный Clip, который можно остановить */
   case class PlayerHandle(clip: Clip):
+    /** Текущая позиция воспроизведения в секундах */
+    def positionSeconds: Double = clip.getMicrosecondPosition / 1_000_000.0
+
+    def isRunning: Boolean = clip.isRunning
+
     def stop(): Unit =
       if clip.isRunning then clip.stop()
       clip.close()
 
-  /** Запускает воспроизведение и возвращает handle для остановки.
-    * Воспроизведение асинхронное — IO возвращает управление сразу.
+  /** Запускает воспроизведение и возвращает handle.
+    * Воспроизведение асинхронное.
     */
   def play(path: String): IO[PlayerHandle] = IO.delay {
     val file = new File(path)
@@ -31,7 +34,6 @@ object AudioPlayer:
     PlayerHandle(clip)
   }
 
-  /** Остановить воспроизведение */
   def stop(handle: PlayerHandle): IO[Unit] = IO.delay {
     handle.stop()
   }

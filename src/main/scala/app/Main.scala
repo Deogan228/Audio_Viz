@@ -34,12 +34,18 @@ def analyze(config: Config): IO[Unit] =
 
     _           <- IO.println("Показать визуализацию со звуком? (y/n)")
     answer      <- IO.readLine
-    _           <- runAnimationIfNeeded(answer, frames, config.filePath)
+    _           <- runAnimationIfNeeded(answer, frames, beats, bpm, config.filePath)
   yield ()
 
-def runAnimationIfNeeded(answer: String, frames: Vector[SpectrumFrame], path: String): IO[Unit] =
+def runAnimationIfNeeded(
+    answer: String,
+    frames: Vector[SpectrumFrame],
+    beats: Vector[Beat],
+    bpm: Double,
+    path: String
+): IO[Unit] =
   if answer.trim.toLowerCase == "y" then
-    Visualizer.animateWithAudio(frames, path, height = 20, width = 60)
+    Visualizer.animateWithAudio(frames, beats, bpm, path, height = 20, width = 80)
   else
     IO.println("Готово.")
 
