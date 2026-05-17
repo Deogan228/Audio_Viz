@@ -32,14 +32,14 @@ def analyze(config: Config): IO[Unit] =
     result       = AnalysisResult(wav.header, frames, beats, bpm)
     _           <- IO.println(Visualizer.summary(result))
 
-    _           <- IO.println("Показать визуализацию? (y/n)")
+    _           <- IO.println("Показать визуализацию со звуком? (y/n)")
     answer      <- IO.readLine
-    _           <- runAnimationIfNeeded(answer, frames)
+    _           <- runAnimationIfNeeded(answer, frames, config.filePath)
   yield ()
 
-def runAnimationIfNeeded(answer: String, frames: Vector[SpectrumFrame]): IO[Unit] =
+def runAnimationIfNeeded(answer: String, frames: Vector[SpectrumFrame], path: String): IO[Unit] =
   if answer.trim.toLowerCase == "y" then
-    Visualizer.animate(frames, fps = 20, height = 20, width = 60)
+    Visualizer.animateWithAudio(frames, path, height = 20, width = 60)
   else
     IO.println("Готово.")
 

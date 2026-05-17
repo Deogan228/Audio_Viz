@@ -2,13 +2,19 @@ package domain
 
 import monads.{State, Writer, Monoid}
 import monads.Monoid.given
+import scala.annotation.tailrec
 
 /** Детектор битов по энергии звука.
   *
   * Идея: считаем энергию каждого кадра, ведём скользящее среднее последних N кадров.
   * Если энергия текущего кадра существенно выше среднего — это бит.
   *
-  * Состояние (история энергий) держим в State-монаде вместо изменяемой коллекции.
+  * Состояние (история энергий) держим в State-монаде.
+  *
+  * Важная деталь реализации: для длинных треков нельзя строить одну
+  * большую State-программу через foldLeft + for-comprehension — это
+  * вызовет StackOverflow на 10к+ кадрах (наша State-монада без trampoline).
+  * Вместо этого мы прогоняем State итеративно через хвостовую рекурсию.
   */
 object BeatDetector:
 
@@ -61,23 +67,36 @@ object BeatDetector:
       (DetectorState(newHistory, newLastBeatTime), beat)
     }
 
-  /** Прогоняет State по всем кадрам, собирает биты и считает BPM */
+  /** Прогоняет State по всем кадрам через хвостовую рекурсию.
+    *
+    * Мы НЕ строим большую State-программу заранее — это привело бы к
+    * StackOverflow при разворачивании flatMap. Вместо этого мы вызываем
+    * step.run(state) на каждом шаге и протаскиваем новое состояние дальше.
+    *
+    * Семантически эквивалентно for-comprehension над State, но без рекурсии.
+    */
   def detectAll(
       frames: Vector[SpectrumFrame],
       threshold: Double,
       windowSize: Int
   ): Writer[Vector[String], (Vector[Beat], Double)] =
-    val program: State[DetectorState, Vector[Option[Beat]]] =
-      frames.zipWithIndex.foldLeft(State.pure[DetectorState, Vector[Option[Beat]]](Vector.empty)) {
-        case (acc, (frame, idx)) =>
-          for
-            beats <- acc
-            b     <- step(idx, frame, threshold, windowSize)
-          yield beats :+ b
-      }
 
-    val (_, results) = program.run(DetectorState.empty)
-    val beats = results.flatten
+    @tailrec
+    def loop(
+        idx: Int,
+        state: DetectorState,
+        acc: Vector[Beat]
+    ): Vector[Beat] =
+      if idx >= frames.length then acc
+      else
+        val (newState, maybeBeat) =
+          step(idx, frames(idx), threshold, windowSize).run(state)
+        val newAcc = maybeBeat match
+          case Some(b) => acc :+ b
+          case None    => acc
+        loop(idx + 1, newState, newAcc)
+
+    val beats = loop(0, DetectorState.empty, Vector.empty)
     val bpm = calcBpm(beats)
 
     Writer(
@@ -90,10 +109,7 @@ object BeatDetector:
     )
 
   /** Считает BPM по медиане интервалов между битами.
-    *
-    * Почему медиана, а не среднее:
-    *   - Среднее сильно искажается длинными паузами в начале/конце трека
-    *   - Медиана устойчива к выбросам и даёт стабильный результат
+    * Медиана устойчива к выбросам — лучше среднего для нашей задачи.
     */
   private def calcBpm(beats: Vector[Beat]): Double =
     if beats.length < 2 then 0.0

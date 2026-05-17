@@ -6,21 +6,19 @@ import monads.IO
 object Visualizer:
 
   // ANSI-коды
-  private val Clear     = "\u001b[2J"   // очистить весь экран
-  private val Home      = "\u001b[H"    // курсор в (1,1)
-  private val ClearLine = "\u001b[K"    // очистить строку до конца
-  private val Reset     = "\u001b[0m"
+  private val Clear      = "\u001b[2J"
+  private val Home       = "\u001b[H"
+  private val ClearLine  = "\u001b[K"
+  private val Reset      = "\u001b[0m"
   private val HideCursor = "\u001b[?25l"
   private val ShowCursor = "\u001b[?25h"
 
-  // Цвета для разных частотных диапазонов
-  private val ColorBass = "\u001b[31m"   // красный — басы
-  private val ColorMid  = "\u001b[33m"   // жёлтый — средние
-  private val ColorHigh = "\u001b[36m"   // голубой — высокие
+  private val ColorBass = "\u001b[31m"
+  private val ColorMid  = "\u001b[33m"
+  private val ColorHigh = "\u001b[36m"
 
-  /** Рендерит один кадр спектра как набор столбиков */
+  /** Рендерит один кадр спектра */
   def renderFrame(frame: SpectrumFrame, height: Int, width: Int): String =
-    // Делим бины на группы — по одной на столбик
     val binsPerCol = math.max(1, frame.bins.length / width)
     val cols = (0 until width).map { col =>
       val from = col * binsPerCol
@@ -29,11 +27,9 @@ object Visualizer:
       else frame.bins.slice(from, to).max
     }
 
-    // Нормализуем (логарифмически — звук лучше воспринимается так)
     val maxVal = if cols.isEmpty then 1.0 else math.max(cols.max, 1e-9)
     val normalized = cols.map(v => math.sqrt(v / maxVal))
 
-    // Рендерим. Идём по строкам сверху вниз
     val sb = new StringBuilder
     for row <- 0 until height do
       val rowHeight = (height - row).toDouble / height
@@ -47,30 +43,65 @@ object Visualizer:
       sb.append(Reset).append(ClearLine).append('\n')
     sb.toString
 
-  /** Показывает спектр всех кадров с задержкой между ними (анимация).
+  /** Анимация спектра с синхронизацией под воспроизведение аудио.
     *
-    * Ключевая фишка: перед каждым кадром возвращаем курсор в (1,1)
-    * через "\u001b[H", и каждая строка чистится через "\u001b[K".
-    * Так кадры рисуются поверх друг друга, не съезжая вниз.
+    * Кадры FFT идут с фиксированной скоростью: один кадр на каждые
+    * fftSize сэмплов. При sampleRate=44100 и fftSize=1024 это ~43 кадра/сек.
+    *
+    * Для синхронизации со звуком мы:
+    *   1. Запоминаем момент старта (System.nanoTime).
+    *   2. Для каждого кадра вычисляем его "идеальное" время.
+    *   3. Если опаздываем — пропускаем кадр, если опережаем — ждём.
     */
-  def animate(frames: Vector[SpectrumFrame], fps: Int, height: Int, width: Int): IO[Unit] =
-    val frameDelayMs = 1000 / fps
-    val setup = IO.delay { print(Clear); print(Home); print(HideCursor) }
-    val cleanup = IO.delay { print(ShowCursor); println(); println("Готово.") }
+  def animateWithAudio(
+      frames: Vector[SpectrumFrame],
+      audioPath: String,
+      height: Int,
+      width: Int
+  ): IO[Unit] =
+    if frames.isEmpty then IO.pure(())
+    else
+      val fftSize    = frames.head.fftSize
+      val sampleRate = frames.head.sampleRate
+      val frameTimeNs = (fftSize.toLong * 1_000_000_000L) / sampleRate
 
-    val frameProgram = frames.foldLeft(IO.pure(())) { (acc, frame) =>
       for
-        _ <- acc
-        _ <- IO.delay { print(Home); print(renderFrame(frame, height, width)) }
-        _ <- IO.delay(Thread.sleep(frameDelayMs))
+        handle <- AudioPlayer.play(audioPath)
+        _      <- IO.delay { print(Clear); print(Home); print(HideCursor) }
+        _      <- renderLoop(frames, frameTimeNs, height, width)
+        _      <- AudioPlayer.stop(handle)
+        _      <- IO.delay { print(ShowCursor); println(); println("Готово.") }
       yield ()
-    }
 
-    for
-      _ <- setup
-      _ <- frameProgram
-      _ <- cleanup
-    yield ()
+  /** Цикл рендеринга, синхронизированный с реальным временем */
+  private def renderLoop(
+      frames: Vector[SpectrumFrame],
+      frameTimeNs: Long,
+      height: Int,
+      width: Int
+  ): IO[Unit] = IO.delay {
+    val startTime = System.nanoTime()
+    var i = 0
+    while i < frames.length do
+      val targetTime = startTime + i * frameTimeNs
+      val now = System.nanoTime()
+      val sleepNs = targetTime - now
+
+      if sleepNs > 0 then
+        // Опережаем: ждём
+        Thread.sleep(sleepNs / 1_000_000, (sleepNs % 1_000_000).toInt)
+        print(Home)
+        print(renderFrame(frames(i), height, width))
+        i += 1
+      else if sleepNs > -frameTimeNs then
+        // Чуть опаздываем: рендерим без задержки
+        print(Home)
+        print(renderFrame(frames(i), height, width))
+        i += 1
+      else
+        // Сильно опаздываем: пропускаем кадр без рендеринга
+        i += 1
+  }
 
   /** Краткая текстовая сводка по результату анализа */
   def summary(result: AnalysisResult): String =
