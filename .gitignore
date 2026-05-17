@@ -1,4 +1,0 @@
-echo "target/" > .gitignore
-echo ".bsp/" >> .gitignore
-echo ".metals/" >> .gitignore
-echo ".idea/" >> .gitignore
