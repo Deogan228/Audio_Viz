@@ -1,8 +1,12 @@
 package monads
 
-/** State[S, A] = функция S => (S, A).
-  * Моделирует изменяемое состояние без мутации:
-  * каждое действие возвращает новое состояние и значение.
+/** Блок 0. Наивный State[S, A] = функция S => (S, A).
+  *
+  * Моделирует изменяемое состояние без мутации: каждое действие
+  * возвращает новое состояние и значение.
+  *
+  * В предметной части (детектор битов) State используется напрямую,
+  * а в UI-части его роль выполняет zio.Ref.
   */
 final case class State[S, A](run: S => (S, A)):
   def flatMap[B](f: A => State[S, B]): State[S, B] =
@@ -28,3 +32,8 @@ object State:
 
   /** Изменить состояние функцией */
   def modify[S](f: S => S): State[S, Unit] = State(s => (f(s), ()))
+
+  given stateMonad[S]: Monad[[A] =>> State[S, A]] with
+    def pure[A](a: A): State[S, A] = State.pure(a)
+    def flatMap[A, B](ma: State[S, A])(f: A => State[S, B]): State[S, B] =
+      ma.flatMap(f)

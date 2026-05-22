@@ -1,50 +1,59 @@
 package domain
 
-import monads.{IO, Writer, Monoid}
-import monads.Monoid.given
+import zio.{ZIO, Task}
 
-import java.io.{FileInputStream, DataInputStream}
+import java.io.FileInputStream
 import java.nio.{ByteBuffer, ByteOrder}
 
 /** Парсер WAV-файлов (PCM, 16 бит).
   *
-  * WAV это RIFF-контейнер:
+  * WAV — это RIFF-контейнер:
   *   "RIFF" + size + "WAVE"
   *   "fmt " + chunk_size + параметры формата
   *   "data" + chunk_size + сэмплы
   *
-  * Поддерживаются:
-  *   - WAVE_FORMAT_PCM (1)
-  *   - WAVE_FORMAT_EXTENSIBLE (-2, т.е. 0xFFFE)
-  *   - 16 бит на сэмпл
-  *   - моно/стерео (стерео сводится в моно усреднением)
+  * Блок 4 (IO): чтение файла с диска — побочный эффект. В исходной версии
+  * он оборачивался в наивный IO. Теперь это zio.Task: ошибки парсинга
+  * становятся типизированным каналом ошибки ZIO, а не исключениями,
+  * прорывающимися сквозь unsafeRun.
+  *
+  * Возвращаем (WavData, лог) — лог пойдёт в Writer на уровне сценария.
   */
 object WavReader:
 
-  def read(path: String): IO[Writer[Vector[String], WavData]] = IO.delay {
-    val bytes = readAllBytes(path)
-    val (header, samples, extraLog) = parseWav(bytes)
+  /** Прочитать и распарсить WAV-файл.
+    * Task = ZIO[Any, Throwable, A]. Эффект чтения файла + парсинг.
+    */
+  def read(path: String): Task[(WavData, Vector[String])] =
+    for
+      bytes  <- readAllBytes(path)
+      parsed <- ZIO.attempt(parseWav(bytes))
+      (header, samples, extraLog) = parsed
+      log = Vector(
+        s"Загружен файл: $path",
+        s"Sample rate: ${header.sampleRate} Hz",
+        s"Каналов: ${header.channels}",
+        s"Битность: ${header.bitsPerSample} бит",
+        s"Длительность: ${"%.2f".format(header.durationSeconds)} сек",
+        s"Всего сэмплов: ${header.numSamples}"
+      ) ++ extraLog
+    yield (WavData(header, samples), log)
 
-    val log = Vector(
-      s"Загружен файл: $path",
-      s"Sample rate: ${header.sampleRate} Hz",
-      s"Каналов: ${header.channels}",
-      s"Битность: ${header.bitsPerSample} бит",
-      s"Длительность: ${"%.2f".format(header.durationSeconds)} сек",
-      s"Всего сэмплов: ${header.numSamples}"
-    ) ++ extraLog
-
-    Writer(log, WavData(header, samples))
-  }
-
-  private def readAllBytes(path: String): Array[Byte] =
-    val is = new FileInputStream(path)
-    try
-      val dis = new DataInputStream(is)
-      val bytes = new Array[Byte](is.available())
-      dis.readFully(bytes)
-      bytes
-    finally is.close()
+  /** Чтение файла как ресурс: ZIO.acquireReleaseWith гарантирует закрытие
+    * потока даже при ошибке — это ZIO-замена try/finally.
+    */
+  private def readAllBytes(path: String): Task[Array[Byte]] =
+    ZIO.acquireReleaseWith(ZIO.attempt(new FileInputStream(path)))(is => ZIO.succeed(is.close())) { is =>
+      ZIO.attempt {
+        val available = is.available()
+        val bytes = new Array[Byte](available)
+        var off = 0
+        while off < available do
+          val r = is.read(bytes, off, available - off)
+          if r < 0 then off = available else off += r
+        bytes
+      }
+    }
 
   private def parseWav(bytes: Array[Byte]): (WavHeader, Vector[Double], Vector[String]) =
     val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
@@ -55,7 +64,6 @@ object WavReader:
     val wave = readString(buf, 4)
     require(wave == "WAVE", s"Не WAV-файл (ожидалось WAVE, получено $wave)")
 
-    // Ищем чанк "fmt "
     skipUntilChunk(buf, "fmt ")
     val fmtSize = buf.getInt()
     val fmtStart = buf.position()
@@ -73,7 +81,6 @@ object WavReader:
       case 3  => "IEEE float"
       case _  => s"unknown ($audioFormat)"
 
-    // Для extensible нужно прочитать GUID-формат
     val isExtensible = audioFormat == -2
     val effectiveFormat =
       if isExtensible && fmtSize >= 40 then
@@ -81,24 +88,20 @@ object WavReader:
         buf.getShort()           // valid bits per sample
         buf.getInt()             // channel mask
         val subFormatCode = buf.getShort()  // первые 2 байта GUID
-        // Остаток GUID пропускаем
         buf.position(buf.position() + 14)
         subFormatCode
       else audioFormat
 
-    // Пропускаем хвост fmt-чанка
     val readSoFar = buf.position() - fmtStart
     if fmtSize > readSoFar then
       buf.position(fmtStart + fmtSize)
 
-    // Проверяем что итоговый формат — PCM
     require(
       effectiveFormat == 1,
       s"Поддерживается только PCM. Формат заголовка: $formatInfo, эффективный код: $effectiveFormat"
     )
     require(bitsPerSample == 16, s"Поддерживается только 16 бит, получено $bitsPerSample")
 
-    // Ищем чанк "data"
     skipUntilChunk(buf, "data")
     val dataSize = buf.getInt()
 
@@ -123,8 +126,7 @@ object WavReader:
   private def skipUntilChunk(buf: ByteBuffer, target: String): Unit =
     while buf.remaining() >= 8 do
       val id = readString(buf, 4)
-      if id == target then
-        return
+      if id == target then return
       else
         val size = buf.getInt()
         buf.position(buf.position() + size)

@@ -1,5 +1,7 @@
 package domain
 
+import zio.{ZLayer, ULayer}
+
 /** Заголовок WAV-файла */
 case class WavHeader(
     sampleRate: Int,
@@ -56,7 +58,12 @@ case class BandSummary(
     avgDominant: Double
 )
 
-/** Конфигурация анализатора — для Reader-монады */
+/** Конфигурация анализатора.
+  *
+  * В исходной версии конфиг пробрасывался через наивный Reader[Config, A].
+  * Теперь это ZIO-окружение: предметные функции имеют тип
+  * ZIO[Config, E, A], а Config поставляется через ZLayer.
+  */
 case class Config(
     filePath: String,
     outputJsonPath: String = "report.json",
@@ -68,3 +75,10 @@ case class Config(
     midRange:  (Int, Int) = (250, 4000),
     highRange: (Int, Int) = (4000, 20000)
 )
+
+object Config:
+  /** ZLayer, поставляющий готовый Config в окружение ZIO.
+    * Это ZIO-замена наивного Reader: вместо Reader.run(cfg) мы делаем
+    * effect.provide(Config.layer(cfg)).
+    */
+  def layer(cfg: Config): ULayer[Config] = ZLayer.succeed(cfg)

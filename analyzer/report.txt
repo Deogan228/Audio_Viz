@@ -1,6 +1,6 @@
 === Отчёт анализа аудио ===
 
-Файл:              wav/ddd.wav
+Файл:              D:\audio-viz\analyzer\wav\tatjana-kurtukova-aleshenka (online-audio-converter.com).wav
 Длительность:      192,84 сек
 Sample rate:       96000 Hz
 Каналов:           2

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source": {
-    "path": "wav/ddd.wav",
+    "path": "D:\\audio-viz\\analyzer\\wav\\tatjana-kurtukova-aleshenka (online-audio-converter.com).wav",
     "sampleRate": 96000,
     "channels": 2,
     "bitsPerSample": 16,

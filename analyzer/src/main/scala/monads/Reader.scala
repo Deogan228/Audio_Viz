@@ -1,7 +1,9 @@
 package monads
 
-/** Reader[Env, A] = функция Env => A, обёрнутая в монаду.
-  * Используется для проброса конфигурации без явной передачи параметров.
+/** Блок 0. Наивный Reader[Env, A] = функция Env => A в обёртке монады.
+  *
+  * Демонстрационная реализация. В предметной части роль Reader выполняет
+  * ZIO-окружение: ZIO[Config, E, A] и ZLayer для проброса конфигурации.
   */
 final case class Reader[Env, A](run: Env => A):
   def flatMap[B](f: A => Reader[Env, B]): Reader[Env, B] =
@@ -18,3 +20,8 @@ object Reader:
 
   /** Получить часть Env через геттер */
   def asks[Env, A](f: Env => A): Reader[Env, A] = Reader(f)
+
+  given readerMonad[Env]: Monad[[A] =>> Reader[Env, A]] with
+    def pure[A](a: A): Reader[Env, A] = Reader.pure(a)
+    def flatMap[A, B](ma: Reader[Env, A])(f: A => Reader[Env, B]): Reader[Env, B] =
+      ma.flatMap(f)
