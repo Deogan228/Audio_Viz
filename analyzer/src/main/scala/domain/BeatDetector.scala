@@ -28,7 +28,15 @@ object BeatDetector:
     */
   private val MinBeatIntervalSec = 0.2
 
-  /** Состояние детектора (для State-монолады):
+  /** Музыкальный диапазон, в который нормализуем BPM.
+    * Детектор по энергии часто срабатывает и на доле, и на её половине,
+    * из-за чего "сырой" BPM выходит кратным реальному (octave error).
+    * Приводим результат в типичный музыкальный диапазон удвоением/делением.
+    */
+  private val MinMusicalBpm = 70.0
+  private val MaxMusicalBpm = 180.0
+
+  /** Состояние детектора (для State-монады):
     *  - energyHistory — скользящее окно энергий для адаптивного порога
     *  - lastBeatTime — время последнего бита (refractory period)
     */
@@ -102,21 +110,23 @@ object BeatDetector:
         loop(idx + 1, newState, newAcc)
 
     val beats = loop(0, DetectorState.empty, Vector.empty)
-    val bpm = calcBpm(beats)
+    val rawBpm = calcRawBpm(beats)
+    val bpm = normalizeBpm(rawBpm)
 
     Writer(
       Vector(
         s"Обработано кадров: ${frames.length}",
         s"Найдено битов: ${beats.length}",
-        s"BPM: ${"%.1f".format(bpm)}"
+        s"BPM (сырой): ${"%.1f".format(rawBpm)}",
+        s"BPM (нормализованный): ${"%.1f".format(bpm)}"
       ),
       (beats, bpm)
     )
 
-  /** Считает BPM по медиане интервалов между битами.
+  /** "Сырой" BPM по медиане интервалов между битами.
     * Медиана устойчива к выбросам — лучше среднего для нашей задачи.
     */
-  private def calcBpm(beats: Vector[Beat]): Double =
+  private def calcRawBpm(beats: Vector[Beat]): Double =
     if beats.length < 2 then 0.0
     else
       val intervals = beats.zip(beats.tail)
@@ -127,3 +137,20 @@ object BeatDetector:
       else
         val medianInterval = intervals(intervals.length / 2)
         if medianInterval > 0 then 60.0 / medianInterval else 0.0
+
+  /** Нормализация BPM в музыкальный диапазон.
+    *
+    * Детектор по энергии подвержен octave error: он может считать битами
+    * и сильные доли, и слабые между ними, давая темп вдвое выше реального
+    * (или, наоборот, ловить через одну долю и давать вдвое ниже).
+    * Пока BPM выше диапазона — делим пополам; пока ниже — удваиваем.
+    */
+  private def normalizeBpm(raw: Double): Double =
+    if raw <= 0 then 0.0
+    else
+      @tailrec
+      def fix(bpm: Double): Double =
+        if bpm > MaxMusicalBpm then fix(bpm / 2.0)
+        else if bpm < MinMusicalBpm then fix(bpm * 2.0)
+        else bpm
+      fix(raw)
