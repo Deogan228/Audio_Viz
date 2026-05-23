@@ -119,7 +119,7 @@ src/main/scala/
 └── app/
     └── Main.scala       # ZIOAppDefault: CLI + флаг --ui
 ```
-
+ 
 ## Требования
 
 - JDK 17 или 21
