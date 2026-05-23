@@ -1,7 +1,12 @@
 package monads
 
-/** Writer[Log, A] — пара (лог, значение).
-  * В визуализаторе используется для лога загрузки отчёта и WAV-файла.
+/** Блок 0. Наивный Writer[Log, A] = пара (лог, значение).
+  *
+  * Лог накапливается при последовательных flatMap. Log должен быть
+  * моноидом (для нас — Vector[String]).
+  *
+  * В предметной части Writer используется по требованию ТЗ "в паре мест"
+  * (см. domain/ReportReader.scala). ZIO-сценарий разворачивает лог в консоль.
   */
 final case class Writer[Log, A](log: Log, value: A)(using ml: Monoid[Log]):
   def flatMap[B](f: A => Writer[Log, B]): Writer[Log, B] =
@@ -18,6 +23,7 @@ object Writer:
   def tell[Log: Monoid](entry: Log): Writer[Log, Unit] =
     Writer(entry, ())
 
+/** Минимальный моноид — абстракция над "склейкой" лога */
 trait Monoid[A]:
   def empty: A
   def combine(x: A, y: A): A

@@ -1,94 +1,74 @@
 package domain
 
-import monads.{IO, Reader, State}
+import ui.SpectrumCanvas
+
+import zio.{ZIO, Ref, Scope, Duration}
 
 /** Цикл анимации, синхронизированной с воспроизведением.
   *
-  * Логика:
-  *   1. Запускаем AudioPlayer
-  *   2. В цикле запрашиваем у плеера реальную позицию воспроизведения
-  *   3. По позиции находим текущий BandSnapshot
-  *   4. Через State обновляем AnimationState
-  *   5. Через Reader получаем строку рендера
-  *   6. Печатаем на экран
+  * В исходной версии это был императивный while-цикл с `var animState`
+  * внутри IO.delay — вынужденная мера, потому что наивный IO без
+  * trampoline переполнял стек на тысячах flatMap.
   *
-  * Императивный while-цикл инкапсулирован в IO.delay,
-  * снаружи остаётся чистый функциональный интерфейс.
-  * Это вынужденная мера: наивный IO без trampoline переполняет стек
-  * на цепочке из тысяч flatMap.
+  * Теперь цикл — это рекурсивный ZIO-эффект. ZIO безопасен по стеку
+  * (имеет trampoline), поэтому рекурсия loop -> loop не переполняет стек
+  * даже на длинном треке. Состояние анимации живёт в zio.Ref вместо var.
+  *
+  * Логика:
+  *   1. Запускаем AudioPlayer (как ZIO-ресурс через Scope).
+  *   2. На каждом тике спрашиваем у плеера реальную позицию.
+  *   3. По позиции находим текущий снимок, обновляем Ref (State → Ref).
+  *   4. Через Reader-окружение собираем кадр и отдаём его в Swing-canvas.
+  *   5. Спим 1/fps и повторяем, пока трек не кончился.
   */
 object Animation:
 
-  /** Запуск визуализации */
-  def run(report: Report): Reader[RenderConfig, IO[Unit]] =
-    Reader.asks { cfg =>
-      if report.bands.isEmpty then
-        IO.println("В отчёте нет данных для визуализации")
-      else
-        for
-          handle <- AudioPlayer.play(cfg.wavPath)
-          _      <- Renderer.setup
-          _      <- renderLoop(report, handle, cfg)
-          _      <- AudioPlayer.stop(handle)
-          _      <- Renderer.teardown
-        yield ()
-    }
-
-  /** Главный цикл рендеринга.
-    *
-    * Состояние анимации передаётся через переменную animState
-    * внутри IO.delay — это эквивалент State, развёрнутого в цикл
-    * для избежания StackOverflow.
+  /** Запуск визуализации. Требует RenderConfig в окружении (Reader → ZIO)
+    * и Scope для управления жизнью аудио-ресурса.
     */
-  private def renderLoop(
+  def run(report: Report, canvas: SpectrumCanvas): ZIO[RenderConfig & Scope, Throwable, Unit] =
+    if report.bands.isEmpty then
+      zio.Console.printLine("В отчёте нет данных для визуализации").orDie
+    else
+      for
+        cfg      <- ZIO.service[RenderConfig]
+        handle   <- AudioPlayer.play(cfg.wavPath)
+        stateRef <- Ref.make(AnimationState.initial.copy(activeMode = cfg.mode))
+        beatTimes = report.beats.map(_.timeSec)
+        _        <- loop(report, handle, stateRef, beatTimes, canvas, cfg)
+      yield ()
+
+  /** Главный цикл рендеринга — рекурсивный ZIO-эффект.
+    *
+    * Условие остановки: плеер перестал играть ИЛИ дошли до последнего
+    * снимка. Иначе — обновляем кадр и рекурсивно вызываем себя.
+    */
+  private def loop(
       report: Report,
       handle: AudioPlayer.PlayerHandle,
+      stateRef: Ref[AnimationState],
+      beatTimes: Vector[Double],
+      canvas: SpectrumCanvas,
       cfg: RenderConfig
-  ): IO[Unit] = IO.delay {
-    val Home = "\u001b[H"
-    val beatTimes = report.beats.map(_.timeSec).toArray
-    val snapshots = report.bands
+  ): ZIO[RenderConfig, Throwable, Unit] =
+    val frameDelay = Duration.fromMillis(math.max(1, 1000 / cfg.fps).toLong)
+    val lastIdx = report.bands.length - 1
 
-    var animState = AnimationState.initial
-    var lastRenderedIdx = -1
+    /** Один тик: позиция -> состояние -> кадр -> отрисовка. */
+    val tick: ZIO[RenderConfig, Throwable, Boolean] =
+      for
+        running <- handle.isRunning
+        posSec  <- handle.positionSeconds
+        idx      = Renderer.snapshotIdxAt(report.bands, posSec)
+        isBeat   = Renderer.beatNearby(beatTimes, posSec, 0.05)
+        anim    <- Renderer.tickAnimation(stateRef, idx, isBeat)
+        frame   <- Renderer.buildFrame(report, anim, posSec)
+        _       <- ZIO.attempt(canvas.showFrame(frame))
+      yield running && anim.currentSnapshotIdx < lastIdx
 
-    while handle.isRunning && animState.currentSnapshotIdx < snapshots.length - 1 do
-      val posSec = handle.positionSeconds
-      val targetIdx = findSnapshotIdx(snapshots, posSec)
-
-      if targetIdx > lastRenderedIdx then
-        val isBeat = beatNearby(beatTimes, posSec, 0.05)
-        // Обновляем состояние через State-монаду
-        val (newState, _) = Renderer.tickAnimation(targetIdx, isBeat, cfg).run(animState)
-        animState = newState
-
-        // Рендерим кадр через Reader
-        val rendered = Renderer
-          .renderFrame(snapshots(targetIdx), report.analysis.bpm, animState)
-          .run(cfg)
-
-        print(Home)
-        print(rendered)
-        System.out.flush()
-        lastRenderedIdx = targetIdx
+    tick.flatMap { keepGoing =>
+      if keepGoing then
+        ZIO.sleep(frameDelay) *> loop(report, handle, stateRef, beatTimes, canvas, cfg)
       else
-        Thread.sleep(5)
-  }
-
-  /** Бинарный поиск ближайшего по времени снимка */
-  private def findSnapshotIdx(snapshots: Vector[BandSnapshot], timeSec: Double): Int =
-    if snapshots.isEmpty then 0
-    else
-      val last = snapshots.length - 1
-      // Линейная аппроксимация работает быстрее, т.к. снимки идут равномерно
-      val dt = snapshots(last).timeSec / last
-      math.min(last, math.max(0, (timeSec / dt).toInt))
-
-  /** Был ли бит в окрестности времени? */
-  private def beatNearby(beatTimes: Array[Double], timeSec: Double, windowSec: Double): Boolean =
-    var i = 0
-    var found = false
-    while i < beatTimes.length && !found do
-      if math.abs(beatTimes(i) - timeSec) < windowSec then found = true
-      i += 1
-    found
+        ZIO.unit
+    }

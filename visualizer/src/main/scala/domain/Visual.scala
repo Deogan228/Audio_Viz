@@ -1,5 +1,7 @@
 package domain
 
+import zio.{ZLayer, ULayer}
+
 /** Один бит, прочитанный из JSON-отчёта */
 case class Beat(frameIndex: Int, timeSec: Double, energy: Double)
 
@@ -12,7 +14,7 @@ case class BandSnapshot(
     dominantFreq: Double
 )
 
-/** Информация о исходном файле */
+/** Информация об исходном файле */
 case class SourceInfo(
     path: String,
     sampleRate: Int,
@@ -42,10 +44,16 @@ case class Report(
 /** Режим визуализации */
 enum VisualMode:
   case Spectrum       // столбики энергии по диапазонам
-  case Spectrogram    // накопление по времени (опционально)
-  case Bars3          // только три столбика: бас/средние/высокие
+  case Spectrogram    // накопление по времени
+  case Bars3          // три крупных столбика: бас/средние/высокие
 
-/** Состояние анимации — для State-монады */
+/** Состояние анимации.
+  *
+  * В исходной версии это состояние держалось в наивной State-монаде,
+  * а реально менялось через `var` внутри while-цикла. Теперь это
+  * иммутабельный снимок, который хранится и обновляется через zio.Ref —
+  * это ZIO-замена State (блок 3 ТЗ).
+  */
 case class AnimationState(
     currentSnapshotIdx: Int,
     activeMode: VisualMode,
@@ -57,12 +65,22 @@ object AnimationState:
   val initial: AnimationState =
     AnimationState(0, VisualMode.Spectrum, 0, paused = false)
 
-/** Конфигурация визуализатора — для Reader-монады */
+/** Конфигурация визуализатора.
+  *
+  * В исходной версии пробрасывалась через наивный Reader[RenderConfig, A].
+  * Теперь это ZIO-окружение: рендер-функции имеют тип
+  * ZIO[RenderConfig, E, A], а конфиг поставляется через ZLayer.
+  */
 case class RenderConfig(
     reportPath: String,
     wavPath: String,
     height: Int = 20,
     width: Int = 80,
     beatFlashDurationFrames: Int = 3,
-    fps: Int = 30
+    fps: Int = 30,
+    mode: VisualMode = VisualMode.Spectrum
 )
+
+object RenderConfig:
+  /** ZLayer, поставляющий RenderConfig в окружение ZIO — замена Reader. */
+  def layer(cfg: RenderConfig): ULayer[RenderConfig] = ZLayer.succeed(cfg)
