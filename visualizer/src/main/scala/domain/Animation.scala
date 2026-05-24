@@ -4,11 +4,11 @@ import ui.SpectrumCanvas
 
 import zio.{ZIO, Ref, Scope, Duration}
 
-// Цикл анимации: получаем текущую позицию в треке, обновляем кадр и отправляем на холст.
-// Звук играет параллельно, а мы с ним синхронизируемся.
+// Цикл анимации: получаем текущую позицию в треке, обновляем кадр и отправляем на холст
+// Звук играет параллельно, а мы с ним синхронизируемся
 object Animation:
 
-  /** Запустить визуализацию. Требует настройки (RenderConfig) и область жизни аудио-ресурса (Scope). */
+  /** Запустить визуализацию. Требует настройки (RenderConfig) и область жизни аудио-ресурса (Scope) */
   def run(report: Report, canvas: SpectrumCanvas): ZIO[RenderConfig & Scope, Throwable, Unit] =
     if report.bands.isEmpty then
       zio.Console.printLine("В отчёте нет данных для визуализации").orDie
@@ -21,7 +21,7 @@ object Animation:
         _        <- loop(report, handle, stateRef, beatTimes, canvas, cfg)
       yield ()
 
-  /** Главный цикл. Пока играет музыка и есть кадры — обновляем экран. */
+  /** Главный цикл. Пока играет музыка и есть кадры — обновляем экран */
   private def loop(
       report: Report,
       handle: AudioPlayer.PlayerHandle,

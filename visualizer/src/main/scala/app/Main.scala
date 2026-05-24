@@ -8,9 +8,9 @@ import zio.{ZIO, ZIOAppDefault, ZIOAppArgs, Console, ExitCode, Scope}
 import javax.swing.{JFrame, SwingUtilities, WindowConstants}
 import java.awt.BorderLayout
 
-// Главный вход в программу.
-// Смотрим аргументы командной строки: можно сразу указать файлы или открыть окно выбора.
-// Если ничего не передано — тоже окно выбора.
+// Главный вход в программу
+// Смотрим аргументы командной строки: можно сразу указать файлы или открыть окно выбора
+// Если ничего не передано — тоже окно выбора
 object Main extends ZIOAppDefault:
 
   def run: ZIO[ZIOAppArgs, Nothing, ExitCode] =
@@ -34,13 +34,13 @@ object Main extends ZIOAppDefault:
         else
           runDirect(cfg)
 
-  /** Окно с кнопками для выбора файлов. */
+  /** Окно с кнопками для выбора файлов */
   private def runUi(cfg: RenderConfig): ZIO[Any, Nothing, ExitCode] =
     VisualizerWindow.open(cfg)
       .as(ExitCode.success)
       .catchAll(err => Console.printLine(s"Ошибка UI: ${err.getMessage}").orDie.as(ExitCode.failure))
 
-  /** Прямой запуск. Файлы уже известны — сразу открываем окно визуализации и стартуем анимацию. */
+  /** Прямой запуск. Файлы уже известны — сразу открываем окно визуализации и стартуем анимацию */
   private def runDirect(cfg: RenderConfig): ZIO[Any, Nothing, ExitCode] =
     val effect: ZIO[Any, Throwable, Unit] =
       for
@@ -63,7 +63,7 @@ object Main extends ZIOAppDefault:
       .catchAll(err => Console.printLine(s"Ошибка: ${err.getMessage}").orDie)
       .as(ExitCode.success)
 
-  /** Создать окно с холстом для рисования спектра. */
+  /** Создать окно с холстом для рисования спектра */
   private def makeWindow(): ZIO[Any, Throwable, SpectrumCanvas] =
     ZIO.attempt {
       val canvas = new SpectrumCanvas

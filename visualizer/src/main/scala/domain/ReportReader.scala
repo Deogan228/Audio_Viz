@@ -6,10 +6,10 @@ import zio.{ZIO, Task}
 
 import scala.io.Source
 
-// Чтение JSON-отчёта анализатора. Возвращает структуру с данными и диагностический лог.
+// Чтение JSON-отчёта анализатора. Возвращает структуру с данными и диагностический лог
 object ReportReader:
 
-  /** Прочитать файл, распарсить и собрать лог загрузки. */
+  /** Прочитать файл, распарсить и собрать лог загрузки */
   def read(path: String): Task[Writer[Vector[String], Report]] =
     for
       raw    <- readFile(path)
@@ -26,13 +26,13 @@ object ReportReader:
       )
       Writer(log, report)
 
-  /** Открываем файл, читаем всё содержимое, автоматически закрываем. */
+  /** Открываем файл, читаем всё содержимое, автоматически закрываем */
   private def readFile(path: String): Task[String] =
     ZIO.acquireReleaseWith(ZIO.attempt(Source.fromFile(path, "UTF-8")))(s => ZIO.succeed(s.close())) { src =>
       ZIO.attempt(src.mkString)
     }
 
-  /** Чистое преобразование распарсенного JSON в наш Report. */
+  /** Чистое преобразование распарсенного JSON в наш Report */
   private def jsonToReport(j: SimpleJson.Value): Report =
     val obj = j.asObject
 

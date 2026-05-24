@@ -5,7 +5,7 @@ import zio.{ZLayer, ULayer}
 /** Один бит, прочитанный из JSON-отчёта */
 case class Beat(frameIndex: Int, timeSec: Double, energy: Double)
 
-// Снимок громкости по частотам в конкретный момент времени.
+// Снимок громкости по частотам в конкретный момент времени
 case class BandSnapshot(
     timeSec: Double,
     bass: Double,
@@ -14,7 +14,7 @@ case class BandSnapshot(
     dominantFreq: Double
 )
 
-// Информация об исходном аудиофайле.
+// Информация об исходном аудиофайле
 case class SourceInfo(
     path: String,
     sampleRate: Int,
@@ -24,7 +24,7 @@ case class SourceInfo(
     numSamples: Long
 )
 
-// Параметры, с которыми делался анализ.
+// Параметры, с которыми делался анализ
 case class AnalysisInfo(
     fftSize: Int,
     framesCount: Int,
@@ -33,7 +33,7 @@ case class AnalysisInfo(
     beatsCount: Int
 )
 
-// Весь отчёт, который мы прочитали из JSON.
+// Весь отчёт, который мы прочитали из JSON
 case class Report(
     source: SourceInfo,
     analysis: AnalysisInfo,
@@ -41,14 +41,14 @@ case class Report(
     bands: Vector[BandSnapshot]
 )
 
-// Как именно будем показывать звук.
+// Как именно будем показывать звук
 enum VisualMode:
   case Spectrum       // столбики по частотам
   case Spectrogram    // накопление по времени
   case Bars3          // три крупные полосы: бас/середина/верха
 
-// Состояние анимации: где мы сейчас, что показываем, мигает ли бит.
-// Хранится в ZIO Ref, чтобы менять без мутаций.
+// Состояние анимации: где мы сейчас, что показываем, мигает ли бит
+// Хранится в ZIO Ref, чтобы менять без мутаций
 case class AnimationState(
     currentSnapshotIdx: Int,
     activeMode: VisualMode,
@@ -60,8 +60,8 @@ object AnimationState:
   val initial: AnimationState =
     AnimationState(0, VisualMode.Spectrum, 0, paused = false)
 
-// Настройки визуализации: пути к файлам, размеры, FPS, режим.
-// Подаётся в ZIO-окружение, чтобы не таскать параметры явно.
+// Настройки визуализации: пути к файлам, размеры, FPS, режим
+// Подаётся в ZIO-окружение, чтобы не таскать параметры явно
 case class RenderConfig(
     reportPath: String,
     wavPath: String,
@@ -73,5 +73,5 @@ case class RenderConfig(
 )
 
 object RenderConfig:
-  // ZLayer, который кладёт конфиг в окружение.
+  // ZLayer, который кладёт конфиг в окружение
   def layer(cfg: RenderConfig): ULayer[RenderConfig] = ZLayer.succeed(cfg)
