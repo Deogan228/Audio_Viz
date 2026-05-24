@@ -9,30 +9,20 @@ import java.io.File
 import javax.swing.{JFrame, JButton, JPanel, JLabel, JFileChooser, SwingUtilities, WindowConstants}
 import javax.swing.filechooser.FileNameExtensionFilter
 
-/** Главное окно визуализатора — графический "интерфейс на view".
-  *
-  * Связывает Swing-события с ZIO:
-  *   - кнопки выбирают JSON-отчёт и WAV-файл;
-  *   - кнопка "Запустить" стартует ZIO-цикл Animation, который проигрывает
-  *     звук и синхронно кормит SpectrumCanvas кадрами;
-  *   - флаг "идёт визуализация" хранится в zio.Ref (блок 3: Ref как
-  *     замена глобальной переменной).
-  *
-  * Swing-вызовы — побочные эффекты, поэтому обёрнуты в ZIO.attempt и
-  * исполняются на EDT через SwingUtilities.invokeLater.
-  */
+// Окно с кнопками «Выбрать JSON», «Выбрать WAV», «Запустить».
+// Связывает клики по кнопкам с запуском ZIO-эффектов.
 object VisualizerWindow:
 
   private val runtime = Runtime.default
 
-  /** Запустить ZIO-эффект "из мира Swing" (вне ZIO App). */
+  // Запустить ZIO из мира Swing (вне ZIO App).
   private def unsafeRunAsync[E, A](effect: ZIO[Any, E, A]): Unit =
     Unsafe.unsafe { implicit u =>
       val _ = runtime.unsafe.fork(effect)
       ()
     }
 
-  /** Построить и показать окно. */
+  // Построить окно и показать. Дальше ждём действий пользователя.
   def open(initial: RenderConfig): ZIO[Any, Throwable, Unit] =
     for
       busyRef   <- Ref.make(false)
@@ -88,7 +78,7 @@ object VisualizerWindow:
     frame.setLocationRelativeTo(null)
     frame.setVisible(true)
 
-  /** Запуск ZIO-цикла визуализации для выбранных файлов. */
+  // Запустить визуализацию по нажатию кнопки.
   private def startVisualization(
       canvas: SpectrumCanvas,
       status: JLabel,
@@ -111,14 +101,14 @@ object VisualizerWindow:
                                    status.setText("Загрузка отчёта…")
                                  }
                  reportWriter <- ReportReader.read(cfg.reportPath)
-                 // Writer (блок 2): разворачиваем лог загрузки в консоль.
+                 // Показываем лог загрузки в консоль.
                  _            <- ZIO.foreachDiscard(reportWriter.log)(l =>
                                    zio.Console.printLine(s"  [log] $l").orDie)
                  report        = reportWriter.value
                  _            <- onEdt(status.setText(
                                    s"Воспроизведение: ${shortName(cfg.wavPath)}  " +
                                    s"(${report.bands.length} кадров, BPM ${"%.1f".format(report.analysis.bpm)})"))
-                 // Animation требует RenderConfig (Reader→ZIO) и Scope (ресурс аудио).
+                 // Запускаем анимацию (ей нужен RenderConfig и Scope).
                  _            <- runAnimation(report, canvas, cfg)
                  _            <- onEdt(status.setText("Готово. Воспроизведение завершено."))
                yield ()
@@ -131,11 +121,7 @@ object VisualizerWindow:
 
     unsafeRunAsync(safe)
 
-  /** Запустить цикл анимации, предоставив окружение и Scope.
-    * Сначала поставляем RenderConfig (Reader→ZIO), затем ZIO.scoped
-    * закрывает оставшееся требование Scope и гарантирует освобождение
-    * аудио-ресурса по завершении.
-    */
+  // Оборачиваем вызов Animation.run в ZIO.scoped, чтобы аудио-ресурс корректно освободился.
   private def runAnimation(
       report: Report,
       canvas: SpectrumCanvas,

@@ -8,17 +8,9 @@ import zio.{ZIO, ZIOAppDefault, ZIOAppArgs, Console, ExitCode, Scope}
 import javax.swing.{JFrame, SwingUtilities, WindowConstants}
 import java.awt.BorderLayout
 
-/** Точка входа визуализатора аудио.
-  *
-  * Блок 4 (IO → ZIO): весь сценарий — ZIO-программа на ZIOAppDefault.
-  * Наивный IO остаётся только в monads/ как демонстрация блока 0.
-  *
-  * Использование:
-  *   sbt "run report.json track.wav"               — окно визуализации
-  *   sbt "run report.json track.wav --mode bars"    — другой режим
-  *   sbt "run --ui"                                 — окно с выбором файлов
-  *   sbt run                                        — спросит пути в консоли
-  */
+// Главный вход в программу.
+// Смотрим аргументы командной строки: можно сразу указать файлы или открыть окно выбора.
+// Если ничего не передано — тоже окно выбора.
 object Main extends ZIOAppDefault:
 
   def run: ZIO[ZIOAppArgs, Nothing, ExitCode] =
@@ -36,21 +28,19 @@ object Main extends ZIOAppDefault:
         (Console.printLine(s"Ошибка: $error") *> Console.printLine(usage))
           .as(ExitCode.failure).orDie
       case Right(cfg) =>
-        // Если файлы не заданы или передан --ui — открываем окно выбора.
+        // Если файлы не заданы или явно попросили UI — показываем окно выбора.
         if uiFlag || cfg.reportPath.isEmpty || cfg.wavPath.isEmpty then
           runUi(cfg)
         else
           runDirect(cfg)
 
-  /** Окно с кнопками выбора файлов. */
+  /** Окно с кнопками для выбора файлов. */
   private def runUi(cfg: RenderConfig): ZIO[Any, Nothing, ExitCode] =
     VisualizerWindow.open(cfg)
       .as(ExitCode.success)
       .catchAll(err => Console.printLine(s"Ошибка UI: ${err.getMessage}").orDie.as(ExitCode.failure))
 
-  /** Прямой запуск: файлы уже заданы в аргументах — сразу открываем окно
-    * визуализации и стартуем анимацию.
-    */
+  /** Прямой запуск. Файлы уже известны — сразу открываем окно визуализации и стартуем анимацию. */
   private def runDirect(cfg: RenderConfig): ZIO[Any, Nothing, ExitCode] =
     val effect: ZIO[Any, Throwable, Unit] =
       for
@@ -73,7 +63,7 @@ object Main extends ZIOAppDefault:
       .catchAll(err => Console.printLine(s"Ошибка: ${err.getMessage}").orDie)
       .as(ExitCode.success)
 
-  /** Создать окно визуализации и вернуть его canvas. */
+  /** Создать окно с холстом для рисования спектра. */
   private def makeWindow(): ZIO[Any, Throwable, SpectrumCanvas] =
     ZIO.attempt {
       val canvas = new SpectrumCanvas
@@ -108,7 +98,7 @@ object Main extends ZIOAppDefault:
       case report :: wav :: rest if !report.startsWith("--") && !wav.startsWith("--") =>
         parseOptions(rest, RenderConfig(reportPath = report, wavPath = wav))
       case single :: rest if !single.startsWith("--") =>
-        // задан только один путь — этого мало, откроем окно выбора
+        // Если указан только один путь — откроем окно выбора.
         parseOptions(rest, RenderConfig(reportPath = single, wavPath = ""))
       case rest =>
         parseOptions(rest, RenderConfig(reportPath = "", wavPath = ""))

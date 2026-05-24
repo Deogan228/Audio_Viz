@@ -4,28 +4,11 @@ import ui.SpectrumCanvas
 
 import zio.{ZIO, Ref, Scope, Duration}
 
-/** Цикл анимации, синхронизированной с воспроизведением.
-  *
-  * В исходной версии это был императивный while-цикл с `var animState`
-  * внутри IO.delay — вынужденная мера, потому что наивный IO без
-  * trampoline переполнял стек на тысячах flatMap.
-  *
-  * Теперь цикл — это рекурсивный ZIO-эффект. ZIO безопасен по стеку
-  * (имеет trampoline), поэтому рекурсия loop -> loop не переполняет стек
-  * даже на длинном треке. Состояние анимации живёт в zio.Ref вместо var.
-  *
-  * Логика:
-  *   1. Запускаем AudioPlayer (как ZIO-ресурс через Scope).
-  *   2. На каждом тике спрашиваем у плеера реальную позицию.
-  *   3. По позиции находим текущий снимок, обновляем Ref (State → Ref).
-  *   4. Через Reader-окружение собираем кадр и отдаём его в Swing-canvas.
-  *   5. Спим 1/fps и повторяем, пока трек не кончился.
-  */
+// Цикл анимации: получаем текущую позицию в треке, обновляем кадр и отправляем на холст.
+// Звук играет параллельно, а мы с ним синхронизируемся.
 object Animation:
 
-  /** Запуск визуализации. Требует RenderConfig в окружении (Reader → ZIO)
-    * и Scope для управления жизнью аудио-ресурса.
-    */
+  /** Запустить визуализацию. Требует настройки (RenderConfig) и область жизни аудио-ресурса (Scope). */
   def run(report: Report, canvas: SpectrumCanvas): ZIO[RenderConfig & Scope, Throwable, Unit] =
     if report.bands.isEmpty then
       zio.Console.printLine("В отчёте нет данных для визуализации").orDie
@@ -38,11 +21,7 @@ object Animation:
         _        <- loop(report, handle, stateRef, beatTimes, canvas, cfg)
       yield ()
 
-  /** Главный цикл рендеринга — рекурсивный ZIO-эффект.
-    *
-    * Условие остановки: плеер перестал играть ИЛИ дошли до последнего
-    * снимка. Иначе — обновляем кадр и рекурсивно вызываем себя.
-    */
+  /** Главный цикл. Пока играет музыка и есть кадры — обновляем экран. */
   private def loop(
       report: Report,
       handle: AudioPlayer.PlayerHandle,
@@ -54,7 +33,7 @@ object Animation:
     val frameDelay = Duration.fromMillis(math.max(1, 1000 / cfg.fps).toLong)
     val lastIdx = report.bands.length - 1
 
-    /** Один тик: позиция -> состояние -> кадр -> отрисовка. */
+    // Один тик: позиция плеера -> индекс кадра -> обновление состояния -> отрисовка.
     val tick: ZIO[RenderConfig, Throwable, Boolean] =
       for
         running <- handle.isRunning
