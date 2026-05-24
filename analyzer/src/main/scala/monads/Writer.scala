@@ -19,7 +19,7 @@ object Writer:
 trait Monoid[A]:
   def empty: A
   def combine(x: A, y: A): A
-
+ 
 object Monoid:
   given vectorStringMonoid: Monoid[Vector[String]] with
     def empty: Vector[String] = Vector.empty
