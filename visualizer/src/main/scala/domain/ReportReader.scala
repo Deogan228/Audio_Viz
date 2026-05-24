@@ -6,18 +6,10 @@ import zio.{ZIO, Task}
 
 import scala.io.Source
 
-/** Чтение JSON-отчёта от анализатора.
-  *
-  * Блок 4 (IO → ZIO): чтение файла с диска — побочный эффект, обёрнут
-  * в zio.Task с гарантированным закрытием источника.
-  *
-  * Блок 2 (Writer): результат возвращается в наивном Writer — это то
-  * самое "место", где по ТЗ Writer остаётся буквально. ZIO-сценарий
-  * разворачивает накопленный лог в консоль.
-  */
+// Чтение JSON-отчёта анализатора. Возвращает структуру с данными и диагностический лог.
 object ReportReader:
 
-  /** Прочитать и распарсить отчёт. Возвращает Writer с диагностическим логом. */
+  /** Прочитать файл, распарсить и собрать лог загрузки. */
   def read(path: String): Task[Writer[Vector[String], Report]] =
     for
       raw    <- readFile(path)
@@ -34,15 +26,13 @@ object ReportReader:
       )
       Writer(log, report)
 
-  /** Чтение файла как ресурс: ZIO.acquireReleaseWith закрывает Source
-    * даже при ошибке парсинга — ZIO-замена try/finally.
-    */
+  /** Открываем файл, читаем всё содержимое, автоматически закрываем. */
   private def readFile(path: String): Task[String] =
     ZIO.acquireReleaseWith(ZIO.attempt(Source.fromFile(path, "UTF-8")))(s => ZIO.succeed(s.close())) { src =>
       ZIO.attempt(src.mkString)
     }
 
-  /** Преобразование разобранного JSON в типизированный Report. Чистая функция. */
+  /** Чистое преобразование распарсенного JSON в наш Report. */
   private def jsonToReport(j: SimpleJson.Value): Report =
     val obj = j.asObject
 

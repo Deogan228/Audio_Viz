@@ -1,10 +1,6 @@
 package monads
 
-/** Блок 0. Наивный Reader[Env, A] = функция Env => A в обёртке монады.
-  *
-  * Демонстрационная реализация. В предметной части роль Reader выполняет
-  * ZIO-окружение: ZIO[RenderConfig, E, A] и ZLayer.
-  */
+// Паттерн «читатель»: вычисления зависят от окружения, которое незримо передаётся.
 final case class Reader[Env, A](run: Env => A):
   def flatMap[B](f: A => Reader[Env, B]): Reader[Env, B] =
     Reader(env => f(run(env)).run(env))
