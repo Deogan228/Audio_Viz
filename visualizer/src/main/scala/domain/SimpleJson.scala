@@ -1,11 +1,6 @@
 package domain
 
-/** Минимальный JSON-парсер (recursive descent).
-  *
-  * Поддерживает: объекты, массивы, строки, числа, true/false/null.
-  * Достаточно для отчётов анализатора. Это чистый код — никаких
-  * эффектов и монад, поэтому ZIO здесь не нужен.
-  */
+// Свой маленький парсер JSON — без зависимостей, умеет всё, что нужно для отчёта.
 object SimpleJson:
 
   sealed trait Value:
@@ -40,7 +35,7 @@ object SimpleJson:
     if !p.eof then throw new RuntimeException(s"Ожидался EOF, есть лишний текст в позиции ${p.pos}")
     v
 
-  /** Recursive descent parser */
+  /** Рекурсивный парсер */
   private class Parser(val input: String):
     var pos: Int = 0
     def eof: Boolean = pos >= input.length
