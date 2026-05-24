@@ -16,7 +16,6 @@ object Writer:
   def tell[Log: Monoid](entry: Log): Writer[Log, Unit] =
     Writer(entry, ())
 
-/** Минимальный моноид — абстракция над "склейкой" лога */
 trait Monoid[A]:
   def empty: A
   def combine(x: A, y: A): A
