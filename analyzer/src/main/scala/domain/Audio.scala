@@ -58,12 +58,6 @@ case class BandSummary(
     avgDominant: Double
 )
 
-/** Конфигурация анализатора.
-  *
-  * В исходной версии конфиг пробрасывался через наивный Reader[Config, A].
-  * Теперь это ZIO-окружение: предметные функции имеют тип
-  * ZIO[Config, E, A], а Config поставляется через ZLayer.
-  */
 case class Config(
     filePath: String,
     outputJsonPath: String = "report.json",
@@ -77,8 +71,4 @@ case class Config(
 )
 
 object Config:
-  /** ZLayer, поставляющий готовый Config в окружение ZIO.
-    * Это ZIO-замена наивного Reader: вместо Reader.run(cfg) мы делаем
-    * effect.provide(Config.layer(cfg)).
-    */
   def layer(cfg: Config): ULayer[Config] = ZLayer.succeed(cfg)

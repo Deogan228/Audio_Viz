@@ -5,19 +5,6 @@ import ui.AnalyzerWindow
 
 import zio.{ZIO, ZIOAppDefault, ZIOAppArgs, Console, ExitCode}
 
-/** Точка входа анализатора аудио.
-  *
-  * Блок 4 (IO → ZIO): весь сценарий — это ZIO-программа, запускаемая
-  * через ZIOAppDefault. Наивный IO остаётся только в monads/ как
-  * учебная демонстрация блока 0.
-  *
-  * Использование:
-  *   sbt "run track.wav"                              — анализ в консоли
-  *   sbt "run track.wav --fft 2048 --threshold 1.5"   — с параметрами
-  *   sbt "run --ui"                                   — графическое окно
-  *   sbt "run --ui track.wav"                         — окно + сразу файл
-  *   sbt run                                          — спросит путь
-  */
 object Main extends ZIOAppDefault:
 
   def run: ZIO[ZIOAppArgs, Nothing, ExitCode] =

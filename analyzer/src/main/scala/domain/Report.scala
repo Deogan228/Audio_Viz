@@ -4,19 +4,6 @@ import zio.{ZIO, URIO, Task}
 
 import java.io.{FileWriter, BufferedWriter}
 
-/** Формирование и сохранение отчёта анализа.
-  *
-  * Поддерживается два формата:
-  *   - JSON (для визуализатора и других программ)
-  *   - человеко-читаемый текстовый отчёт
-  *
-  * JSON делаем вручную без библиотек — для курсовой это плюс и не тянет
-  * лишнюю зависимость.
-  *
-  * Блок 1 (Reader → ZIO): buildJson/buildText зависят от Config, поэтому
-  * имеют тип URIO[Config, String]. Блок 4 (IO → ZIO): save — это Task,
-  * запись файла как ZIO-эффект с гарантированным закрытием writer'а.
-  */
 object Report:
 
   /** Сформировать JSON-отчёт. Зависит от Config через ZIO-окружение. */
@@ -69,7 +56,6 @@ object Report:
       sb.toString
     }
 
-  /** Сформировать человеко-читаемый текстовый отчёт */
   def buildText(
       result: AnalysisResult,
       bandSummary: BandSummary
@@ -103,13 +89,11 @@ object Report:
          |""".stripMargin
     }
 
-  /** Сохранить строку в файл. ZIO-эффект с гарантированным закрытием. */
   def save(content: String, path: String): Task[Unit] =
     ZIO.acquireReleaseWith(ZIO.attempt(new BufferedWriter(new FileWriter(path))))(w => ZIO.succeed(w.close())) { w =>
       ZIO.attempt(w.write(content))
     }
 
-  /** Простая жанровая характеристика по балансу энергий. */
   def classify(s: BandSummary): String =
     val total = s.avgBass + s.avgMid + s.avgHigh
     if total <= 0 then "недостаточно данных"
@@ -122,7 +106,6 @@ object Report:
       else if mp > 0.5 then "сбалансированный (вокал, поп, рок)"
       else "смешанный"
 
-  /** Экранирование строки для JSON */
   private def jsonString(s: String): String =
     val escaped = s
       .replace("\\", "\\\\")
@@ -132,7 +115,6 @@ object Report:
       .replace("\t", "\\t")
     s"\"$escaped\""
 
-  /** Форматирование числа с точкой (не запятой!) — иначе JSON невалиден */
   private def num(d: Double): String =
     if d.isNaN || d.isInfinite then "0"
     else "%.4f".formatLocal(java.util.Locale.US, d)

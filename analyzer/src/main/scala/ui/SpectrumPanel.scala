@@ -5,18 +5,6 @@ import domain.{AnalysisPipeline, BandSnapshot, Beat}
 import java.awt.{Color, Dimension, Graphics, Graphics2D, RenderingHints, BasicStroke, Font}
 import javax.swing.JPanel
 
-/** Панель отрисовки результатов анализа.
-  *
-  * Это "view" в смысле задания — графическое представление результата.
-  * Сам компонент чисто отображающий: ему присваивают Outcome, он рисует.
-  * Никаких эффектов и монад внутри — рисование вызывается Swing'ом
-  * в EDT-потоке, а ZIO-часть только передаёт сюда готовые данные.
-  *
-  * Рисуем три блока:
-  *   1) огибающую энергии баса/средних/высоких по времени;
-  *   2) отметки битов на таймлайне;
-  *   3) сводку: BPM, спектральный баланс, жанр.
-  */
 class SpectrumPanel extends JPanel:
 
   private var outcome: Option[AnalysisPipeline.Outcome] = None

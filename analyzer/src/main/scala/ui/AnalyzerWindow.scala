@@ -9,15 +9,6 @@ import java.io.File
 import javax.swing.{JFrame, JButton, JPanel, JLabel, JFileChooser, SwingUtilities, WindowConstants}
 import javax.swing.filechooser.FileNameExtensionFilter
 
-/** Главное окно анализатора — графический "интерфейс на view".
-  *
-  * Связывает Swing-события с ZIO-конвейером:
-  *   - кнопка "Открыть WAV" запускает ZIO-эффект анализа;
-  *   - результат отдаётся в SpectrumPanel для отрисовки;
-  *   - кнопка "Сохранить отчёт" пишет JSON/текст на диск;
-  *   - флаг "идёт анализ" и последний результат хранятся в zio.Ref
-  *     (блок 3 ТЗ: Ref как замена глобальной изменяемой переменной).
-  */
 object AnalyzerWindow:
 
   private val runtime = Runtime.default
@@ -126,7 +117,6 @@ object AnalyzerWindow:
 
     unsafeRunAsync(safe)
 
-  /** Сохранение последнего результата анализа в JSON и текст. */
   private def saveReport(
       frame: JFrame,
       status: JLabel,

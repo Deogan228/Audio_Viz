@@ -4,42 +4,11 @@ import monads.{State, Writer, Monoid}
 import monads.Monoid.given
 import scala.annotation.tailrec
 
-/** Детектор битов по энергии звука.
-  *
-  * Идея: считаем энергию каждого кадра, ведём скользящее среднее последних
-  * N кадров. Если энергия текущего кадра существенно выше среднего — это бит.
-  *
-  * --- ЗДЕСЬ НАМЕРЕННО ИСПОЛЬЗУЮТСЯ СОБСТВЕННЫЕ МОНАДЫ ---
-  *
-  * Блок 3 (State): состояние детектора (история энергий, время последнего
-  * бита) держим в наивной State-монаде из блока 0.
-  *
-  * Блок 2 (Writer): результат detectAll возвращается в наивном Writer —
-  * это одно из "пары мест", где по ТЗ Writer остаётся как есть. ZIO-сценарий
-  * в app/ просто разворачивает накопленный лог в консоль.
-  *
-  * Само вычисление чистое и тотальное, поэтому ZIO здесь не нужен:
-  * эффектов (файлы, консоль) тут нет.
-  */
 object BeatDetector:
-
-  /** Минимальный интервал между битами в секундах.
-    * 200мс соответствует максимальному BPM = 300.
-    */
   private val MinBeatIntervalSec = 0.2
-
-  /** Музыкальный диапазон, в который нормализуем BPM.
-    * Детектор по энергии часто срабатывает и на доле, и на её половине,
-    * из-за чего "сырой" BPM выходит кратным реальному (octave error).
-    * Приводим результат в типичный музыкальный диапазон удвоением/делением.
-    */
   private val MinMusicalBpm = 70.0
   private val MaxMusicalBpm = 180.0
 
-  /** Состояние детектора (для State-монады):
-    *  - energyHistory — скользящее окно энергий для адаптивного порога
-    *  - lastBeatTime — время последнего бита (refractory period)
-    */
   case class DetectorState(
       energyHistory: Vector[Double],
       lastBeatTime: Double
@@ -48,10 +17,6 @@ object BeatDetector:
   object DetectorState:
     val empty: DetectorState = DetectorState(Vector.empty, -Double.MaxValue)
 
-  /** Обрабатывает один кадр и обновляет состояние.
-    * Возвращает State[DetectorState, Option[Beat]] — чистое описание
-    * перехода состояния.
-    */
   def step(
       frameIdx: Int,
       frame: SpectrumFrame,
@@ -79,15 +44,6 @@ object BeatDetector:
       (DetectorState(newHistory, newLastBeatTime), beat)
     }
 
-  /** Прогоняет State по всем кадрам через хвостовую рекурсию.
-    *
-    * Мы НЕ строим большую State-программу через foldLeft + for — наша
-    * наивная State без trampoline переполнила бы стек на 10к+ кадрах.
-    * Вместо этого вызываем step.run(state) пошагово. Семантически это
-    * эквивалентно for-comprehension над State.
-    *
-    * Результат заворачивается в наивный Writer (блок 2).
-    */
   def detectAll(
       frames: Vector[SpectrumFrame],
       threshold: Double,
@@ -123,9 +79,6 @@ object BeatDetector:
       (beats, bpm)
     )
 
-  /** "Сырой" BPM по медиане интервалов между битами.
-    * Медиана устойчива к выбросам — лучше среднего для нашей задачи.
-    */
   private def calcRawBpm(beats: Vector[Beat]): Double =
     if beats.length < 2 then 0.0
     else
@@ -138,13 +91,6 @@ object BeatDetector:
         val medianInterval = intervals(intervals.length / 2)
         if medianInterval > 0 then 60.0 / medianInterval else 0.0
 
-  /** Нормализация BPM в музыкальный диапазон.
-    *
-    * Детектор по энергии подвержен octave error: он может считать битами
-    * и сильные доли, и слабые между ними, давая темп вдвое выше реального
-    * (или, наоборот, ловить через одну долю и давать вдвое ниже).
-    * Пока BPM выше диапазона — делим пополам; пока ниже — удваиваем.
-    */
   private def normalizeBpm(raw: Double): Double =
     if raw <= 0 then 0.0
     else

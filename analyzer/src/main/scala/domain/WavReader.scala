@@ -5,25 +5,8 @@ import zio.{ZIO, Task}
 import java.io.FileInputStream
 import java.nio.{ByteBuffer, ByteOrder}
 
-/** Парсер WAV-файлов (PCM, 16 бит).
-  *
-  * WAV — это RIFF-контейнер:
-  *   "RIFF" + size + "WAVE"
-  *   "fmt " + chunk_size + параметры формата
-  *   "data" + chunk_size + сэмплы
-  *
-  * Блок 4 (IO): чтение файла с диска — побочный эффект. В исходной версии
-  * он оборачивался в наивный IO. Теперь это zio.Task: ошибки парсинга
-  * становятся типизированным каналом ошибки ZIO, а не исключениями,
-  * прорывающимися сквозь unsafeRun.
-  *
-  * Возвращаем (WavData, лог) — лог пойдёт в Writer на уровне сценария.
-  */
 object WavReader:
 
-  /** Прочитать и распарсить WAV-файл.
-    * Task = ZIO[Any, Throwable, A]. Эффект чтения файла + парсинг.
-    */
   def read(path: String): Task[(WavData, Vector[String])] =
     for
       bytes  <- readAllBytes(path)
@@ -39,9 +22,6 @@ object WavReader:
       ) ++ extraLog
     yield (WavData(header, samples), log)
 
-  /** Чтение файла как ресурс: ZIO.acquireReleaseWith гарантирует закрытие
-    * потока даже при ошибке — это ZIO-замена try/finally.
-    */
   private def readAllBytes(path: String): Task[Array[Byte]] =
     ZIO.acquireReleaseWith(ZIO.attempt(new FileInputStream(path)))(is => ZIO.succeed(is.close())) { is =>
       ZIO.attempt {

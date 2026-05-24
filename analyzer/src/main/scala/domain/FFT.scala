@@ -1,20 +1,13 @@
 package domain
 
-/** Быстрое преобразование Фурье (алгоритм Кули-Тьюки).
-  *
-  * Это чистые вычисления — никаких эффектов и монад здесь не нужно.
-  * Функции тотальные и детерминированные.
-  */
 object FFT:
 
-  /** Комплексное число */
   case class Complex(re: Double, im: Double):
     def +(o: Complex): Complex = Complex(re + o.re, im + o.im)
     def -(o: Complex): Complex = Complex(re - o.re, im - o.im)
     def *(o: Complex): Complex = Complex(re * o.re - im * o.im, re * o.im + im * o.re)
     def magnitude: Double = math.sqrt(re * re + im * im)
 
-  /** Рекурсивный FFT. Вход: вектор длины n = 2^k. */
   def fft(xs: Vector[Complex]): Vector[Complex] =
     val n = xs.length
     if n <= 1 then xs
@@ -32,13 +25,9 @@ object FFT:
         else even(idx) - twiddle * odd(idx)
       }
 
-  /** Окно Хэннинга — сглаживает края кадра, уменьшает спектральные утечки */
   def hannWindow(n: Int): Vector[Double] =
     Vector.tabulate(n)(i => 0.5 * (1.0 - math.cos(2.0 * math.Pi * i / (n - 1))))
 
-  /** Разбивает сэмплы на кадры по fftSize, применяет окно и FFT.
-    * Используется только первая половина бинов (вторая зеркальна).
-    */
   def analyze(samples: Vector[Double], sampleRate: Int, fftSize: Int): Vector[SpectrumFrame] =
     val window = hannWindow(fftSize)
     val numFrames = samples.length / fftSize
