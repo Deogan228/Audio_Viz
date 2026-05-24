@@ -1,6 +1,6 @@
 package monads
 
-// Простейшая абстракция монады: умеет pure и flatMap.
+// Простейшая абстракция монады: умеет pure и flatMap
 trait Monad[M[_]]:
   def pure[A](a: A): M[A]
   def flatMap[A, B](ma: M[A])(f: A => M[B]): M[B]

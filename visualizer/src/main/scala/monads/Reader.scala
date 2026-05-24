@@ -1,6 +1,6 @@
 package monads
 
-// Паттерн «читатель»: вычисления зависят от окружения, которое незримо передаётся.
+// Паттерн «читатель»: вычисления зависят от окружения, которое незримо передаётся
 final case class Reader[Env, A](run: Env => A):
   def flatMap[B](f: A => Reader[Env, B]): Reader[Env, B] =
     Reader(env => f(run(env)).run(env))

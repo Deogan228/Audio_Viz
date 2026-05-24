@@ -5,15 +5,8 @@ import domain.{Renderer, VisualMode}
 import java.awt.{Color, Dimension, Graphics, Graphics2D, RenderingHints, BasicStroke, Font}
 import javax.swing.{JPanel, SwingUtilities}
 
-/** Анимированная панель визуализации — графический "интерфейс на view".
-  *
-  * Получает готовые кадры (Renderer.Frame) от ZIO-цикла Animation и
-  * перерисовывает себя. Сам компонент чисто отображающий: вся логика
-  * (синхронизация со звуком, состояние анимации) — на стороне ZIO.
-  *
-  * Поддерживает режимы Spectrum и Bars3; Spectrogram пока рисуется как
-  * Spectrum (накопительный режим — задел на будущее).
-  */
+// Холст, на котором рисуются наши красивые столбики
+// Получает готовые кадры и перерисовывается — никакой логики синхронизации здесь нет
 class SpectrumCanvas extends JPanel:
 
   @volatile private var frame: Option[Renderer.Frame] = None
@@ -21,9 +14,7 @@ class SpectrumCanvas extends JPanel:
   setPreferredSize(new Dimension(820, 460))
   setBackground(new Color(0x12, 0x14, 0x18))
 
-  /** Принять новый кадр от ZIO-цикла. Может вызываться из ZIO-волокна,
-    * поэтому перерисовку планируем на EDT через invokeLater.
-    */
+  /** Принять кадр от ZIO-цикла и запланировать перерисовку на Swing-потоке */
   def showFrame(f: Renderer.Frame): Unit =
     frame = Some(f)
     SwingUtilities.invokeLater(() => repaint())
@@ -55,7 +46,7 @@ class SpectrumCanvas extends JPanel:
 
     drawLegend(g2, w, h - 22)
 
-  /** Верхняя строка статуса: время, BPM, режим, индикатор бита. */
+  // Верхняя строка: время, BPM, режим, индикатор бита
   private def drawStatus(g2: Graphics2D, f: Renderer.Frame, w: Int): Unit =
     g2.setFont(new Font("Monospaced", Font.BOLD, 14))
     g2.setColor(new Color(0xe6, 0xe8, 0xec))
@@ -71,7 +62,7 @@ class SpectrumCanvas extends JPanel:
       g2.setColor(Color.WHITE)
       g2.drawString("BEAT", w - 78, 31)
 
-  /** Режим "спектр": три зоны во всю ширину, высота — корень из энергии. */
+  // Режим "спектр": три зоны во всю ширину, высота — корень из энергии
   private def drawSpectrum(g2: Graphics2D, f: Renderer.Frame, top: Int, h: Int, w: Int): Unit =
     val s = f.snapshot
     val maxE = math.max(math.max(s.bass, s.mid), s.high).max(1e-9)
@@ -86,7 +77,7 @@ class SpectrumCanvas extends JPanel:
     bar(third,      third,         s.mid,  new Color(0xe0, 0xb0, 0x4f))
     bar(third * 2,  w - third * 2, s.high, new Color(0x4f, 0xc0, 0xe0))
 
-  /** Режим "3 полосы": столбики с зазорами. */
+  // Режим "3 полосы": столбики с зазорами
   private def drawBars3(g2: Graphics2D, f: Renderer.Frame, top: Int, h: Int, w: Int): Unit =
     val s = f.snapshot
     val maxE = math.max(math.max(s.bass, s.mid), s.high).max(1e-9)
@@ -102,7 +93,7 @@ class SpectrumCanvas extends JPanel:
     bar(gap * 2 + barW,          s.mid,  new Color(0xe0, 0xb0, 0x4f))
     bar(gap * 3 + barW * 2,      s.high, new Color(0x4f, 0xc0, 0xe0))
 
-  /** Нижняя строка с подписями диапазонов. */
+  // Подписи внизу
   private def drawLegend(g2: Graphics2D, w: Int, y: Int): Unit =
     g2.setFont(new Font("SansSerif", Font.PLAIN, 12))
     val third = w / 3

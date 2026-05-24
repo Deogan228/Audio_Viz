@@ -9,8 +9,8 @@ import java.io.File
 import javax.swing.{JFrame, JButton, JPanel, JLabel, JFileChooser, SwingUtilities, WindowConstants}
 import javax.swing.filechooser.FileNameExtensionFilter
 
-// Окно с кнопками «Выбрать JSON», «Выбрать WAV», «Запустить».
-// Связывает клики по кнопкам с запуском ZIO-эффектов.
+// Окно с кнопками «Выбрать JSON», «Выбрать WAV», «Запустить»
+// Связывает клики по кнопкам с запуском ZIO-эффектов
 object VisualizerWindow:
 
   private val runtime = Runtime.default
@@ -22,7 +22,7 @@ object VisualizerWindow:
       ()
     }
 
-  // Построить окно и показать. Дальше ждём действий пользователя.
+  // Построить окно и показать. Дальше ждём действий пользователя
   def open(initial: RenderConfig): ZIO[Any, Throwable, Unit] =
     for
       busyRef   <- Ref.make(false)
@@ -78,7 +78,7 @@ object VisualizerWindow:
     frame.setLocationRelativeTo(null)
     frame.setVisible(true)
 
-  // Запустить визуализацию по нажатию кнопки.
+  // Запустить визуализацию по нажатию кнопки
   private def startVisualization(
       canvas: SpectrumCanvas,
       status: JLabel,
@@ -108,7 +108,7 @@ object VisualizerWindow:
                  _            <- onEdt(status.setText(
                                    s"Воспроизведение: ${shortName(cfg.wavPath)}  " +
                                    s"(${report.bands.length} кадров, BPM ${"%.1f".format(report.analysis.bpm)})"))
-                 // Запускаем анимацию (ей нужен RenderConfig и Scope).
+                 // Запускаем анимацию (ей нужен RenderConfig и Scope)
                  _            <- runAnimation(report, canvas, cfg)
                  _            <- onEdt(status.setText("Готово. Воспроизведение завершено."))
                yield ()
@@ -121,7 +121,7 @@ object VisualizerWindow:
 
     unsafeRunAsync(safe)
 
-  // Оборачиваем вызов Animation.run в ZIO.scoped, чтобы аудио-ресурс корректно освободился.
+  // Оборачиваем вызов Animation.run в ZIO.scoped, чтобы аудио-ресурс корректно освободился
   private def runAnimation(
       report: Report,
       canvas: SpectrumCanvas,
