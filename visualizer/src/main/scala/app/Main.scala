@@ -84,7 +84,7 @@ object Main extends ZIOAppDefault:
       |  sbt "run --ui"                                — окно с выбором файлов
       |
       |Опции:
-      |  --mode <spectrum|bars|spectrogram>   режим визуализации
+      |  --mode <spectrum|bars>   режим визуализации
       |  --width <число>                      ширина окна (по умолчанию 820)
       |  --height <число>                     высота окна (по умолчанию 460)
       |  --fps <число>                        частота кадров (по умолчанию 30)
@@ -110,7 +110,6 @@ object Main extends ZIOAppDefault:
         v.toLowerCase match
           case "spectrum"    => parseOptions(rest, cfg.copy(mode = VisualMode.Spectrum))
           case "bars"        => parseOptions(rest, cfg.copy(mode = VisualMode.Bars3))
-          case "spectrogram" => parseOptions(rest, cfg.copy(mode = VisualMode.Spectrogram))
           case other         => Left(s"неизвестный режим: $other")
       case "--width" :: v :: rest =>
         v.toIntOption match

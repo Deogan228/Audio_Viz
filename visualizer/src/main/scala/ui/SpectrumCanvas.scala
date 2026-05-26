@@ -41,8 +41,8 @@ class SpectrumCanvas extends JPanel:
     val plotTop = 70
     val plotH = h - plotTop - 30
     f.mode match
-      case VisualMode.Bars3 => drawBars3(g2, f, plotTop, plotH, w)
-      case _                => drawSpectrum(g2, f, plotTop, plotH, w)
+      case VisualMode.Bars3    => drawBars3(g2, f, plotTop, plotH, w)
+      case VisualMode.Spectrum => drawSpectrum(g2, f, plotTop, plotH, w)
 
     drawLegend(g2, w, h - 22)
 
@@ -53,7 +53,6 @@ class SpectrumCanvas extends JPanel:
     val modeStr = f.mode match
       case VisualMode.Spectrum    => "спектр"
       case VisualMode.Bars3       => "3 полосы"
-      case VisualMode.Spectrogram => "спектрограмма"
     g2.drawString(f"время: ${f.timeSec}%6.2f с    BPM: ${f.bpm}%5.1f    режим: $modeStr", 20, 30)
 
     if f.beatActive then
